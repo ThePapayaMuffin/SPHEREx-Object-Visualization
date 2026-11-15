@@ -6,13 +6,33 @@ import { proceduralSky } from "./dummy/dummyData";
 
 export interface ViewerHandle { goTo(ra: number, dec: number, fov?: number): void; zoomBy(f: number): void; pan(dx: number, dy: number): void }
 /** centerOffsetX: shift the view centre right by this many px (to make room for a side panel). */
-interface Props { catalog: OverlayObject[]; cutout: SkyCutout | null; frameIndex: number; layer: string; showLabels: boolean; onView: (v: ViewState) => void; centerOffsetX?: number }
+/** extra: field-star markers (Gaia/CatWISE). track: target's position on each frame's date; trackIndex = current frame. */
+interface Props { catalog: OverlayObject[]; cutout: SkyCutout | null; frameIndex: number; layer: string; showLabels: boolean; onView: (v: ViewState) => void; centerOffsetX?: number;
+  extra?: OverlayObject[]; track?: { ra: number; dec: number }[]; trackIndex?: number;
+  /** false = show each SPHEREx pixel as a sharp square (good for checking 1-pixel shifts). */
+  smooth?: boolean;
+  /** Paint masked (untrusted) pixels red. Default true. */
+  showMasked?: boolean }
 const D2R = Math.PI / 180, R = 500, MIN_FOV = 0.02;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (ra: number) => ((ra % 360) + 360) % 360;
 // RA/Dec -> point on sky sphere. RA grows leftwards on screen (astronomical convention).
 const dir = (ra: number, dec: number, r = 1) => new THREE.Vector3(-Math.cos(ra * D2R) * Math.cos(dec * D2R) * r, Math.sin(dec * D2R) * r, Math.sin(ra * D2R) * Math.cos(dec * D2R) * r);
 
+/** Frame image material: transparent (masked / no-data) pixels are painted in MASK_RED, or left as background grey. */
+const MASK_RED = 0xe0332e;
+function frameMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { map: { value: null }, maskColor: { value: new THREE.Color(MASK_RED) }, showMask: { value: 1 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: `uniform sampler2D map; uniform vec3 maskColor; uniform float showMask; varying vec2 vUv;
+      void main(){
+        vec4 t = texture2D(map, vUv);
+        gl_FragColor = vec4(mix(t.rgb, maskColor, (1.0 - t.a) * showMask), 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+}
 type S = { ra: number; dec: number; fov: number; dirty: boolean };
 function constrain(s: S, c: SkyCutout | null) {
   s.dec = clamp(s.dec, -89.5, 89.5); s.ra = wrap(s.ra);
@@ -21,7 +41,8 @@ function constrain(s: S, c: SkyCutout | null) {
     s.dec = clamp(s.dec, c.dec - h, c.dec + h); s.ra = wrap(c.ra + clamp(dr, -hr, hr)); s.fov = clamp(s.fov, MIN_FOV, c.fovDeg * 1.2);
   } else s.fov = clamp(s.fov, MIN_FOV, 100);
 }
-type Label = { name: string; x: number; y: number; src: string };
+type Label = { name: string; x: number; y: number; src: string; mag?: number };
+type Pt = { x: number; y: number };
 
 export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
   const mount = useRef<HTMLDivElement>(null);
@@ -29,6 +50,7 @@ export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
   const st = useRef<S>({ ra: 83.8, dec: -5.4, fov: 60, dirty: true });
   const gl = useRef<{ scene?: THREE.Scene; plane?: THREE.Mesh; cache: Map<string, THREE.Texture> }>({ cache: new Map() });
   const [labels, setLabels] = useState<Label[]>([]);
+  const [track, setTrack] = useState<Pt[]>([]);
 
   useImperativeHandle(ref, () => ({
     goTo: (ra, dec, fov) => { Object.assign(st.current, { ra, dec, dirty: true }); if (fov) st.current.fov = fov; },
@@ -71,10 +93,13 @@ export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
       cam.updateProjectionMatrix(); cam.lookAt(dir(s.ra, s.dec)); cam.updateMatrixWorld();
       renderer.render(scene, cam);
       P.current.onView({ ra: s.ra, dec: s.dec, fov: s.fov });
-      const list = P.current.cutout ? P.current.cutout.overlays : P.current.catalog, out: Label[] = [], v = new THREE.Vector3();
-      if (P.current.showLabels) for (const o of list) { v.copy(dir(o.ra, o.dec, R)).project(cam);
-        if (v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && out.length < 150) out.push({ name: o.name, src: o.source, x: (v.x + 1) / 2 * el.clientWidth, y: (1 - v.y) / 2 * el.clientHeight }); }
+      const c = P.current.cutout, named = P.current.showLabels ? (c ? c.overlays : P.current.catalog) : [];
+      const list = [...(c ? P.current.extra ?? [] : []), ...named], out: Label[] = [], v = new THREE.Vector3();
+      const toScreen = (ra: number, dec: number): Pt | null => { v.copy(dir(ra, dec, R)).project(cam);
+        return v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 ? { x: (v.x + 1) / 2 * el.clientWidth, y: (1 - v.y) / 2 * el.clientHeight } : null; };
+      for (const o of list) { const p = toScreen(o.ra, o.dec); if (p && out.length < 900) out.push({ name: o.name, src: o.source, mag: o.mag, ...p }); }
       setLabels(out);
+      setTrack(c ? (P.current.track ?? []).map(t => toScreen(t.ra, t.dec)).filter((p): p is Pt => !!p) : []);
     };
     loop();
     return () => { cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener("keydown", key); renderer.dispose(); renderer.domElement.remove(); };
@@ -85,19 +110,42 @@ export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
     const { scene, cache } = gl.current; if (!scene) return;
     const c = props.cutout;
     if (!c) { if (gl.current.plane) { scene.remove(gl.current.plane); gl.current.plane = undefined; } st.current.dirty = true; return; }
-    if (!gl.current.plane) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff })); scene.add(m); gl.current.plane = m; }
+    if (!gl.current.plane) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frameMaterial()); scene.add(m); gl.current.plane = m; }
     const m = gl.current.plane, w = 2 * 400 * Math.tan(c.fovDeg / 2 * D2R);
     m.scale.set(w, w, 1); m.position.copy(dir(c.ra, c.dec, 400)); m.lookAt(0, 0, 0);
     const load = (url: string, cb?: (t: THREE.Texture) => void) => { const hit = cache.get(url); if (hit) return cb?.(hit);
-      new THREE.TextureLoader().load(url, t => { t.colorSpace = THREE.SRGBColorSpace; cache.set(url, t); cb?.(t); }); };
+      new THREE.TextureLoader().load(url, t => { t.colorSpace = THREE.SRGBColorSpace;
+        t.magFilter = P.current.smooth === false ? THREE.NearestFilter : THREE.LinearFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+        cache.set(url, t); cb?.(t); }); };
     c.frames.forEach(f => Object.values(f.images).forEach(u => load(u))); // preload everything
     const url = c.frames[props.frameIndex]?.images[props.layer]; if (!url) return;
-    load(url, t => { const mm = m.material as THREE.MeshBasicMaterial; mm.map = t; mm.needsUpdate = true; st.current.dirty = true; });
+    load(url, t => { (m.material as THREE.ShaderMaterial).uniforms.map.value = t; st.current.dirty = true; });
   }, [props.cutout, props.frameIndex, props.layer]);
-  useEffect(() => { st.current.dirty = true; }, [props.showLabels, props.catalog, props.cutout, props.centerOffsetX]);
+  useEffect(() => {
+    const m = gl.current.plane?.material as THREE.ShaderMaterial | undefined;
+    if (m?.uniforms) { m.uniforms.showMask.value = props.showMasked === false ? 0 : 1; st.current.dirty = true; }
+  }, [props.showMasked, props.cutout]);
+  // Switch every loaded frame between smooth and sharp pixels.
+  useEffect(() => {
+    const f = props.smooth === false ? THREE.NearestFilter : THREE.LinearFilter;
+    gl.current.cache.forEach(t => { if (t.magFilter !== f) { t.magFilter = f; t.needsUpdate = true; } });
+    st.current.dirty = true;
+  }, [props.smooth]);
+  useEffect(() => { st.current.dirty = true; }, [props.showLabels, props.catalog, props.cutout, props.centerOffsetX, props.extra, props.track]);
 
   return (<div ref={mount} className="viewer">
-    <div className="labels">{labels.map((l, i) => <div key={i} className={`label ${l.src}`} style={{ transform: `translate(${l.x}px,${l.y}px)` }}><i />{l.name}</div>)}</div>
+    <div className="labels">
+      {track.length > 1 && <svg className="track" aria-hidden="true">
+        <polyline points={track.map(p => `${p.x},${p.y}`).join(" ")} />
+        {track.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={i === 0 || i === track.length - 1 ? 3.5 : 2} className={i === (props.trackIndex ?? -1) ? "cur" : i === 0 ? "start" : i === track.length - 1 ? "end" : ""} />)}
+      </svg>}
+      {labels.map((l, i) => {
+        const at = { transform: `translate(${l.x}px,${l.y}px)` };
+        if (l.src === "gaia" || l.src === "catwise") return <div key={i} className={`mark ${l.src}`} style={at} />;
+        if (l.src === "target") return <div key={i} className="label target" style={at}><span className="reticle"><b /><b /><b /><b /></span><em>{l.name}</em></div>;
+        return <div key={i} className={`label ${l.src}`} style={at}><i />{l.name}</div>;
+      })}
+    </div>
     <div className="crosshair" style={props.centerOffsetX ? { transform: `translateX(${props.centerOffsetX}px)` } : undefined} />
   </div>);
 });

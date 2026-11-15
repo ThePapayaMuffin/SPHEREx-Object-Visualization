@@ -35,6 +35,7 @@ class Target:
     source: str = ""       # where the astrometry came from
     notes: str = ""        # what to expect in SPHEREx, honestly
     suggested_detector: str | None = None
+    suggested_fov: float | None = None   # deg; tighter for faint targets so each pixel is big on screen
 
     @property
     def moves(self) -> bool:

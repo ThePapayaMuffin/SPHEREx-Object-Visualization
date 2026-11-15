@@ -14,6 +14,7 @@ const FLAG_INFO: Record<string, [string, "bad" | "warn" | "info"]> = {
 
 function facts(c: SkyCutout) {
   const t = c.target, out: [string, string][] = [];
+  if (c.gridNpix) out.push(["Patch (FOV)", `${(c.fovDeg * 60).toFixed(1)}′ · ${c.gridNpix}×${c.gridNpix} px`]);
   if (!t) return out;
   const mu = Math.hypot(t.pmra, t.pmdec) / 1000;
   if (mu > 0.05) out.push(["Motion", `${mu.toFixed(1)}″/yr · ${(mu / 6.15).toFixed(2)} px/yr`]);
@@ -49,7 +50,7 @@ export function TargetPanel({ cutout, frames, index, layer, meta, open, onToggle
       <i aria-hidden="true">{open ? "−" : "+"}</i>
     </button>
     {open && <div className="tp-body">
-      {named && facts(cutout).length > 0 && <dl className="tp-facts">{facts(cutout).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
+      {facts(cutout).length > 0 && <dl className="tp-facts">{facts(cutout).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
       {!named && <p className="tp-notes">RA {cutout.ra.toFixed(4)}°, Dec {cutout.dec.toFixed(4)}°. Coordinates are treated as fixed (no proper motion).</p>}
       {named && t!.notes && <section><h4>What to expect</h4><p className="tp-notes">{t!.notes}</p></section>}
 

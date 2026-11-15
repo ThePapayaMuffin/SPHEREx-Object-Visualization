@@ -117,9 +117,11 @@ def shared_norm(arrays: list[np.ndarray]) -> ImageNormalize:
 
 
 def to_png(arr: np.ndarray, norm: ImageNormalize) -> bytes:
-    """Greyscale + alpha PNG; masked/no-data pixels are fully transparent."""
+    """Greyscale + alpha PNG; masked/no-data pixels are fully transparent.
+    Under the transparency they get the background level (0 after median subtraction),
+    not black, so smoothing in the viewer doesn't smear dark rings around them."""
     finite = np.isfinite(arr)
-    grey = (np.nan_to_num(np.asarray(norm(np.where(finite, arr, norm.vmin))), nan=0) * 255)
+    grey = (np.nan_to_num(np.asarray(norm(np.where(finite, arr, 0.0))), nan=0) * 255)
     la = np.dstack([grey.clip(0, 255).astype(np.uint8), (finite * 255).astype(np.uint8)])
     buf = io.BytesIO()
     # (h, w, 2) uint8 is read as "LA"; flipud because PNG row 0 is the top (north).

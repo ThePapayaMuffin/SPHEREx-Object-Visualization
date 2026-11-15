@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from . import config
 from .discover import IrsaUnavailable
+from .field import field_stars
 from .frames import DETECTOR_RANGE_UM, DISCOVERY_EPOCH_MJD, build_frames
 from .targets import PRESETS, Target, TargetNotFound, resolve
 
@@ -108,6 +109,13 @@ def resolve_name(q: str | None = Query(None, min_length=1, max_length=100),
         return _overlay(resolve(query))
     except TargetNotFound as e:
         raise HTTPException(404, str(e)) from e
+
+
+@router.get("/api/field")
+def field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge=-90, le=90),
+          fov: float = Query(..., gt=0), mjd: float = Query(..., gt=50000, lt=70000)):
+    """Gaia DR3 + CatWISE2020 stars in the patch, moved to date `mjd` with their proper motions."""
+    return field_stars(ra, dec, min(fov, config.MAX_FOV_DEG * 1.2), mjd)
 
 
 @router.get("/api/catalog")
