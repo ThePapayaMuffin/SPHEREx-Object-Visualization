@@ -16,6 +16,7 @@ from astropy.visualization import AsinhStretch, ImageNormalize, ZScaleInterval
 from astropy.wcs import WCS, FITSFixedWarning
 from PIL import Image
 from reproject import reproject_interp
+from scipy.ndimage import uniform_filter
 
 from . import config
 
@@ -68,10 +69,19 @@ def process(hdul, grid, shape, ra: float, dec: float, zodi: bool = True):
     if zodi and "ZODI" in hdul:
         img = img - hdul["ZODI"].data
     flags = hdul["FLAGS"].data.astype(np.int64)
-    img[(flags & BAD) != 0] = np.nan
+    good = ((flags & BAD) == 0) & np.isfinite(img)
     w = WCS(hdul["IMAGE"].header)
 
-    arr, _ = reproject_interp((img, w), grid, shape_out=shape)
+    # Bilinear reprojection turns every bad pixel into ~4 blank output pixels (2% -> 8%).
+    # So: fill bad pixels from good neighbours, reproject, then re-apply the mask with
+    # nearest-neighbour so exactly the output pixels that came from bad pixels are blank.
+    num = uniform_filter(np.where(good, img, 0.0), size=3)
+    den = uniform_filter(good.astype(float), size=3)
+    fallback = float(np.median(img[good])) if good.any() else 0.0
+    filled = np.where(good, img, np.where(den > 0, num / np.maximum(den, 1e-9), fallback))
+    arr, _ = reproject_interp((filled, w), grid, shape_out=shape)
+    keep, _ = reproject_interp((good.astype(float), w), grid, shape_out=shape, order="nearest-neighbor")
+    arr[~(np.nan_to_num(keep) > 0.5)] = np.nan
 
     x, y = (float(v) for v in w.world_to_pixel(SkyCoord(ra, dec, unit="deg")))
     lam, bw = _wavelength(hdul, x, y)

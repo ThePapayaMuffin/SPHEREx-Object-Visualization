@@ -26,7 +26,7 @@ QUERY_TTL = 6 * 3600       # re-ask IRSA for the image list after 6 h (weekly da
 MAX_FOV_DEG = float(os.environ.get("SPHEREX_MAX_FOV", "0.3"))
 
 # Bump when processing changes, so old cached PNGs are not reused.
-PROC_VERSION = "1"
+PROC_VERSION = "2"  # 2: masks no longer grow during reprojection
 
 CORS_ORIGINS = os.environ.get(
     "SPHEREX_CORS", "http://localhost:5173,http://127.0.0.1:5173"
