@@ -20,13 +20,14 @@ class IrsaUnavailable(RuntimeError):
 
 def _retry(fn):
     last = None
-    for i in range(config.RETRIES):
+    for i in range(config.QUERY_RETRIES):
         try:
             return fn()
         except Exception as e:  # noqa: BLE001 - IRSA errors come in many types
             last = e
-            time.sleep(2 ** i)
-    raise IrsaUnavailable(f"IRSA did not respond after {config.RETRIES} tries: {str(last)[:200]}")
+            if i < config.QUERY_RETRIES - 1:
+                time.sleep(0.5 * 2 ** i)
+    raise IrsaUnavailable(f"IRSA did not respond after {config.QUERY_RETRIES} tries: {str(last)[:200]}")
 
 
 def _release(url: str, fallback: str) -> str:
@@ -65,7 +66,11 @@ def _query_tap(ra: float, dec: float) -> list[dict]:
 
 
 def discover(ra: float, dec: float) -> tuple[list[dict], dict]:
-    """Return (rows, meta). meta.source is 'live', 'cache' or 'stale-cache'."""
+    """Return (rows, meta). meta.source is 'live', 'cache', 'stale-cache' or 'fake'."""
+    if config.FAKE:
+        from .fake import fake_rows
+        return fake_rows(), {"method": "fake", "releases": ["fake"], "source": "fake",
+                             "queried_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "seconds": 0}
     path = config.CACHE / "queries" / f"{cache.key(config.DISCOVERY, config.RELEASES, round(ra, 4), round(dec, 4))}.json"
     fresh = cache.json_get(path, max_age=config.QUERY_TTL)
     if fresh:

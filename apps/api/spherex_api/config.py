@@ -10,9 +10,14 @@ DISCOVERY = os.environ.get("SPHEREX_DISCOVERY", "sia")
 
 CACHE = Path(os.environ.get("SPHEREX_CACHE", Path(__file__).resolve().parent.parent / "cache"))
 
+# SPHEREX_FAKE=1 serves synthetic frames (clearly labelled) so the frontend can be
+# built while IRSA is down. Never use for the real demo.
+FAKE = os.environ.get("SPHEREX_FAKE", "") not in ("", "0", "false")
+
 PIX_ARCSEC = 6.15          # SPHEREx native pixel scale
 WORKERS = 8                # parallel cutout downloads (IRSA suggests 7-12)
-RETRIES = 4                # per IRSA request, with exponential backoff
+RETRIES = 4                # per cutout request, with exponential backoff
+QUERY_RETRIES = 3          # per image search; kept short so "IRSA is down" comes back fast
 TIMEOUT = 120              # seconds per cutout request
 QUERY_TTL = 6 * 3600       # re-ask IRSA for the image list after 6 h (weekly data drops)
 

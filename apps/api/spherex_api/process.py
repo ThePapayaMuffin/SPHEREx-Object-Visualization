@@ -56,6 +56,9 @@ def _wavelength(hdul, x: float, y: float):
         lam, bw = sw.pixel_to_world(x, y)
         return round(float(lam.to_value("um")), 4), round(float(bw.to_value("um")), 4)
     except Exception:  # noqa: BLE001 - missing table or bad header: report unknown
+        h = hdul["IMAGE"].header
+        if "SYN_LAM" in h:  # synthetic data (fake.py) carries its wavelength in the header
+            return float(h["SYN_LAM"]), float(h["SYN_BW"])
         return None, None
 
 
