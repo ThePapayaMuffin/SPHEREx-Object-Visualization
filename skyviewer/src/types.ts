@@ -9,7 +9,9 @@ export interface SkyCutout {
   requestedFovDeg?: number; fovClamped?: boolean;
   layerInfo?: Record<string, { label: string; range_um: [number, number] }>;
   synthetic?: boolean;            // true = invented test data: show a banner
-  target?: { name: string; notes: string; moves: boolean; suggested_detector: string | null };
+  target?: { id: string; name: string; notes: string; moves: boolean; suggested_detector: string | null;
+             pmra: number; pmdec: number; plx: number; source: string };
+  counts?: { exposures_at_position: number; frames: number; failed: number };
   message?: string | null;        // why there are no frames, if so
   releases?: string[];
 }

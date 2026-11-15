@@ -5,7 +5,8 @@ import { SKY_TEXTURE_URL } from "./api/skyApi";
 import { proceduralSky } from "./dummy/dummyData";
 
 export interface ViewerHandle { goTo(ra: number, dec: number, fov?: number): void; zoomBy(f: number): void; pan(dx: number, dy: number): void }
-interface Props { catalog: OverlayObject[]; cutout: SkyCutout | null; frameIndex: number; layer: string; showLabels: boolean; onView: (v: ViewState) => void }
+/** centerOffsetX: shift the view centre right by this many px (to make room for a side panel). */
+interface Props { catalog: OverlayObject[]; cutout: SkyCutout | null; frameIndex: number; layer: string; showLabels: boolean; onView: (v: ViewState) => void; centerOffsetX?: number }
 const D2R = Math.PI / 180, R = 500, MIN_FOV = 0.02;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (ra: number) => ((ra % 360) + 360) % 360;
@@ -65,7 +66,9 @@ export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
       raf = requestAnimationFrame(loop);
       if (!s.dirty) return; s.dirty = false;
       constrain(s, P.current.cutout);
-      cam.fov = s.fov; cam.updateProjectionMatrix(); cam.lookAt(dir(s.ra, s.dec)); cam.updateMatrixWorld();
+      cam.fov = s.fov; const off = P.current.centerOffsetX ?? 0;
+      if (off) cam.setViewOffset(el.clientWidth, el.clientHeight, -off, 0, el.clientWidth, el.clientHeight); else cam.clearViewOffset();
+      cam.updateProjectionMatrix(); cam.lookAt(dir(s.ra, s.dec)); cam.updateMatrixWorld();
       renderer.render(scene, cam);
       P.current.onView({ ra: s.ra, dec: s.dec, fov: s.fov });
       const list = P.current.cutout ? P.current.cutout.overlays : P.current.catalog, out: Label[] = [], v = new THREE.Vector3();
@@ -91,10 +94,10 @@ export const SkyViewer = forwardRef<ViewerHandle, Props>((props, ref) => {
     const url = c.frames[props.frameIndex]?.images[props.layer]; if (!url) return;
     load(url, t => { const mm = m.material as THREE.MeshBasicMaterial; mm.map = t; mm.needsUpdate = true; st.current.dirty = true; });
   }, [props.cutout, props.frameIndex, props.layer]);
-  useEffect(() => { st.current.dirty = true; }, [props.showLabels, props.catalog, props.cutout]);
+  useEffect(() => { st.current.dirty = true; }, [props.showLabels, props.catalog, props.cutout, props.centerOffsetX]);
 
   return (<div ref={mount} className="viewer">
     <div className="labels">{labels.map((l, i) => <div key={i} className={`label ${l.src}`} style={{ transform: `translate(${l.x}px,${l.y}px)` }}><i />{l.name}</div>)}</div>
-    <div className="crosshair" />
+    <div className="crosshair" style={props.centerOffsetX ? { transform: `translateX(${props.centerOffsetX}px)` } : undefined} />
   </div>);
 });
