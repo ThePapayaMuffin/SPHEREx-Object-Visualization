@@ -7,8 +7,13 @@ const API = import.meta.env.VITE_API_URL as string | undefined;
 export async function fetchCutout(req: SkyRequest, signal?: AbortSignal): Promise<SkyCutout> {
   if (!API) return dummyCutout(req);
   const r = await fetch(`${API}/api/cutout`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req), signal });
-  if (!r.ok) throw new Error(`cutout failed: ${r.status}`);
+  if (!r.ok) throw new Error(await errorText(r));
   return r.json();
+}
+/** The back end sends a readable `detail` (e.g. "IRSA is not responding right now…"). */
+async function errorText(r: Response): Promise<string> {
+  try { const d = (await r.json()).detail; if (typeof d === "string") return d; } catch { /* not JSON */ }
+  return `Could not load data for that region (HTTP ${r.status})`;
 }
 /** Name -> coordinates (Gaia/SIMBAD/etc. on the back end). */
 export async function resolveName(q: string): Promise<OverlayObject | null> {

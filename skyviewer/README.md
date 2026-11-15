@@ -31,8 +31,22 @@ Nothing here comes from a single source. Each piece below needs its own dataset 
 - `src/dummy/`: fake data. Delete it and its two imports in `skyApi.ts` when done.
 - `src/types.ts`: the contract below. `src/SkyViewer.tsx`: 3D view. `src/App.tsx`: UI. `src/styles.css`: styling.
 
-## Back-end integration
-Set `VITE_API_URL=http://localhost:8000` in `.env`. Endpoints:
+## Running with the real back end
+The back end is the Python app in `apps/api` (see `apps/api/API.md`).
+
+1. Start it from `apps/api`: `.venv/Scripts/python -m uvicorn spherex_api.main:app --port 8000`.
+   If IRSA is down, set `SPHEREX_FAKE=1` first to get synthetic frames. The viewer shows a "Synthetic test data" banner.
+2. Copy `.env.example` to `.env.local` (it sets `VITE_API_URL=http://localhost:8000`), then run `npm run dev` here.
+
+What the back end adds on top of the contract below (all optional fields, see `src/types.ts`):
+- **Layers are the six SPHEREx detectors (`D1`…`D6`).** Layer buttons show each one's wavelength range. The time bar only steps through frames that have the selected detector, so the date always matches the image.
+- **Every frame has `meta[layer]`**: the wavelength at the target in that exposure (it changes every exposure), the quality flags at the target (shown as a "saturated" badge for OVERFLOW), the release, and where the target is on that date.
+- **Moving stars:** searching by name sends `target`, so the back end follows the star's proper motion. The patch is centred where the star is during the observations, and the target's label moves frame by frame.
+- **FOV is clamped to 0.3°** (`fovClamped: true`). At 6″ pixels, bigger patches mean near-full 72 MB downloads per frame. Names and typed coordinates default to 0.15°.
+- **Errors** come back as readable text (e.g. IRSA down), and the app shows them.
+
+## Back-end integration (contract)
+Set `VITE_API_URL=http://localhost:8000` in `.env.local`. Endpoints:
 
 1. `POST /api/cutout`, body `{ra, dec, fovDeg}` (ICRS degrees):
 ```json

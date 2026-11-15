@@ -38,7 +38,9 @@ to `localhost:8000` with your dev server's proxy so CORS doesn't apply.
 |---|---|
 | `GET /api/health` | `{ok, fake, releases, discovery}` |
 | `GET /api/targets` | `Target[]`: the five challenge targets with astrometry and notes |
-| `GET /api/resolve?name=M101` | `Target` for any name SIMBAD, NED or VizieR knows; 404 if unknown |
+| `POST /api/cutout` | The skyviewer frontend's format: frames grouped by time with one image per detector layer. See `skyviewer/README.md` and `skyviewer/src/types.ts`. |
+| `GET /api/resolve?q=M101` | `{name, ra, dec, source, target}` for any name SIMBAD, NED or VizieR knows (position as of late 2025); 404 if unknown. `name=` also works. |
+| `GET /api/catalog` | The five targets plus well-known bright objects, for the full-sky labels |
 | `GET /api/frames?...` | `FramesManifest` (below) |
 | `GET /api/frames/{key}/{NNN}.png` | One frame. Its URL comes from the manifest. |
 

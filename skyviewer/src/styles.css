@@ -15,6 +15,12 @@ button.primary{background:var(--acc);border-color:var(--acc);color:#04101c;font-
 .group button.on{background:rgba(108,184,255,.22);border-color:var(--acc);color:#fff;position:relative}
 .topbar>button{margin-left:auto}.topbar .group+button{margin-left:0}
 .err{width:100%;color:#ff9b9b;font-size:12px}
+.note{width:100%;color:var(--mute);font-size:12px;max-width:900px}
+.timebar .meta{font-family:ui-monospace,Menlo,monospace;color:var(--text);white-space:nowrap}
+.timebar .flag{margin-left:8px;padding:1px 6px;border-radius:4px;background:rgba(255,170,60,.2);color:#ffc27a;font-weight:500}
+.synthetic{padding:3px 10px;border-radius:var(--r);background:#7a2b00;color:#ffe3cc;font-weight:600;font-size:12px}
+.synthetic.floating{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none}
+.label.target{color:#9dffb0}.label.target i{border-color:#9dffb0}.label.challenge{color:#cfe8ff}
 .readout{display:grid;grid-template-columns:auto auto;gap:2px 12px;margin:0;justify-self:start;font-variant-numeric:tabular-nums}
 .readout dt{color:var(--mute)}.readout dd{margin:0;font-family:ui-monospace,Menlo,monospace}.readout em{color:var(--mute);font-style:normal}
 .timebar{display:flex;align-items:center;gap:12px}.timebar input[type=range]{flex:1;padding:0;border:0;background:none;accent-color:var(--acc)}.timebar time{font-family:ui-monospace,Menlo,monospace;color:var(--mute)}

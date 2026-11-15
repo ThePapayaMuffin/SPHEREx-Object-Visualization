@@ -60,7 +60,12 @@ def build_frames(target: Target, fov: float = 0.1, det: str = "D6",
     if det != "all":
         rows = [r for r in rows if r["detector"] == det]
     n_found = len(rows)
-    rows = _spread(rows, limit)
+    if det == "all":  # `limit` is per detector, so every detector keeps its full baseline
+        dets = sorted({r["detector"] for r in rows})
+        rows = sorted((r for d in dets for r in _spread([x for x in rows if x["detector"] == d], limit)),
+                      key=lambda r: r["mjd"])
+    else:
+        rows = _spread(rows, limit)
 
     center = target.position_at(float(np.median([r["mjd"] for r in rows]))) if rows else ref
     cra, cdec = float(center.ra.deg), float(center.dec.deg)

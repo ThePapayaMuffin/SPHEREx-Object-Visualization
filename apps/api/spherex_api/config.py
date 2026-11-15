@@ -21,6 +21,10 @@ QUERY_RETRIES = 3          # per image search; kept short so "IRSA is down" come
 TIMEOUT = 120              # seconds per cutout request
 QUERY_TTL = 6 * 3600       # re-ask IRSA for the image list after 6 h (weekly data drops)
 
+# Largest field the backend will build. SPHEREx pixels are 6.15", so 0.3 deg = 176 px;
+# much larger means near-full 72 MB downloads per frame. Requests above this are clamped.
+MAX_FOV_DEG = float(os.environ.get("SPHEREX_MAX_FOV", "0.3"))
+
 # Bump when processing changes, so old cached PNGs are not reused.
 PROC_VERSION = "1"
 

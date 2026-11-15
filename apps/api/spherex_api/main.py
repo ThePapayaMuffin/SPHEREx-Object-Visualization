@@ -11,10 +11,13 @@ from fastapi.responses import FileResponse
 from . import config
 from .discover import IrsaUnavailable
 from .frames import build_frames
+from .skyviewer import router as skyviewer_router
 from .targets import PRESETS, Target, TargetNotFound, resolve
 
-app = FastAPI(title="SPHEREx Flipbook API", version="0.2.0")
-app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["GET"])
+app = FastAPI(title="SPHEREx Flipbook API", version="0.3.0")
+app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS,
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+app.include_router(skyviewer_router)  # POST /api/cutout, GET /api/resolve, GET /api/catalog
 
 
 @app.get("/api/health")
@@ -28,22 +31,13 @@ def targets():
     return [t.to_json() for t in PRESETS.values()]
 
 
-@app.get("/api/resolve")
-def resolve_name(name: str = Query(..., min_length=1, max_length=100)):
-    """Look up an object name (preset id, or anything SIMBAD/NED/VizieR knows)."""
-    try:
-        return resolve(name).to_json()
-    except TargetNotFound as e:
-        raise HTTPException(404, str(e)) from e
-
-
 @app.get("/api/frames")
 def frames(
     target: str | None = Query(None, max_length=100,
                                description="Preset id (wise0855, barnard, epsindib, rwaur, rdra) or any object name"),
     ra: float | None = Query(None, ge=0, lt=360, description="Right ascension, degrees (ICRS); used if no target"),
     dec: float | None = Query(None, ge=-90, le=90, description="Declination, degrees (ICRS); used if no target"),
-    fov: float = Query(0.1, gt=0, le=0.5, description="Field of view, degrees"),
+    fov: float = Query(0.1, gt=0, le=config.MAX_FOV_DEG, description="Field of view, degrees"),
     det: str = Query("D6", pattern="^(D[1-6]|all)$", description="Detector D1-D6, or all"),
     limit: int = Query(40, ge=1, le=200, description="Max frames, spread evenly over time"),
     zodi: bool = Query(True, description="Subtract the zodiacal-light model"),

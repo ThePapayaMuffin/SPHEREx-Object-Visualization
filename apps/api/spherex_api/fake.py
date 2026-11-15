@@ -25,11 +25,13 @@ BANDS = {"D1": (0.75, 1.09, 39), "D2": (1.10, 1.62, 41), "D3": (1.63, 2.41, 41),
 
 
 def fake_rows() -> list[dict]:
-    """6 detectors x 8 visits spread over one year (like DR1's baseline)."""
+    """6 detectors x 8 visits over one year (like DR1's baseline). As in SPHEREx, detector
+    pairs D1+D4, D2+D5, D3+D6 see a field at the same moment; pairs come ~a day apart."""
+    pair = {"D1": 0, "D4": 0, "D2": 1, "D5": 1, "D3": 2, "D6": 2}
     rows = []
     for v in range(8):
-        for d, det in enumerate(BANDS):
-            mjd = 60800.5 + v * 52 + d * 0.01
+        for det in BANDS:
+            mjd = 60800.5 + v * 52 + pair[det] * 1.1
             rows.append({"url": f"fake://spherex/fake/l2b-fake-1/{det}/{mjd:.2f}.fits",
                          "detector": det, "mjd": mjd, "release": "fake", "obs_id": f"fake-{v}-{det}"})
     return rows
